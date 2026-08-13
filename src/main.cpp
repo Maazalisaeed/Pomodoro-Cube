@@ -1,9 +1,11 @@
 #include <Arduino.h>
 #include "display.h"
 #include "wifi_clock.h"
+#include "orientation.h"
 
 DisplayManager display;
 WifiClockManager wifiClock;
+OrientationManager orientation;
 
 String formatTime(int h, int m, int s) {
   char buf[9];
@@ -23,6 +25,11 @@ void setup() {
   if (!ok) {
     Serial.println("WiFi/NTP setup failed - check credentials/signal.");
   }
+
+  if (!orientation.begin()) {
+    Serial.println("MPU6050 not found - check wiring!");
+  }
+
   display.clearScreen();
   Serial.println("Clock started.");
 }
@@ -32,6 +39,9 @@ void loop() {
   if (wifiClock.getTime(h, m, s)) {
     display.drawCenteredTime(formatTime(h, m, s));
   }
+
+  orientation.update();
+  orientation.printDebug();
 
   delay(1000);
 }
