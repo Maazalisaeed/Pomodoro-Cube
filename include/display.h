@@ -16,8 +16,11 @@ public:
     // Draws the given time string flicker-free using the off-screen buffer
     void drawCenteredTime(String timeStr);
     void clearScreen();
+    void renderRotatedTime(String timeStr, float angleDeg); // new: rotated version of drawCenteredTime
+
 
 private:
+    void drawRotated(float angleDeg); // blits the current canvas contents to tft, rotated
     Adafruit_GC9A01A tft;
     GFXcanvas16 canvas;
 

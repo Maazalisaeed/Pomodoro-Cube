@@ -48,3 +48,45 @@ void DisplayManager::drawCenteredTime(String timeStr) {
 void DisplayManager::clearScreen() {
     tft.fillScreen(GC9A01A_BLACK);
 }
+void DisplayManager::renderRotatedTime(String timeStr, float angleDeg) {
+    int16_t x1, y1;
+    uint16_t w, h;
+
+    canvas.getTextBounds(timeStr, 0, 0, &x1, &y1, &w, &h);
+    canvas.fillScreen(GC9A01A_BLACK);
+
+    int16_t cursorX = (BOX_W / 2) - (w / 2) - x1;
+    int16_t cursorY = (BOX_H / 2) - (h / 2) - y1;
+
+    canvas.setCursor(cursorX, cursorY);
+    canvas.print(timeStr);
+
+    drawRotated(angleDeg);
+}
+
+void DisplayManager::drawRotated(float angleDeg) {
+    float rad = angleDeg * PI / 180.0f;
+    float cosA = cos(-rad);
+    float sinA = sin(-rad);
+
+    int cx = BOX_W / 2, cy = BOX_H / 2;
+    uint16_t *buf = canvas.getBuffer();
+
+    for (int y = 0; y < BOX_H; y++) {
+        for (int x = 0; x < BOX_W; x++) {
+            int dx = x - cx;
+            int dy = y - cy;
+            int srcX = (int)roundf(dx * cosA - dy * sinA) + cx;
+            int srcY = (int)roundf(dx * sinA + dy * cosA) + cy;
+
+            uint16_t color;
+            if (srcX >= 0 && srcX < BOX_W && srcY >= 0 && srcY < BOX_H) {
+                color = buf[srcY * BOX_W + srcX];
+            } else {
+                color = GC9A01A_BLACK;
+            }
+
+            tft.drawPixel(BOX_X + x, BOX_Y + y, color);
+        }
+    }
+}

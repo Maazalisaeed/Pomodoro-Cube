@@ -2,10 +2,14 @@
 #include "display.h"
 #include "wifi_clock.h"
 #include "orientation.h"
+#include "rotation_animator.h"
 
 DisplayManager display;
 WifiClockManager wifiClock;
 OrientationManager orientation;
+RotationAnimator animator;
+
+int lastKnownTarget = 0;
 
 String formatTime(int h, int m, int s) {
   char buf[9];
@@ -36,12 +40,26 @@ void setup() {
 
 void loop() {
   int h, m, s;
+  static String lastTimeStr = "";
+  String timeStr;
   if (wifiClock.getTime(h, m, s)) {
-    display.drawCenteredTime(formatTime(h, m, s));
+    timeStr = formatTime(h, m, s);
   }
 
   orientation.update();
-  orientation.printDebug();
 
-  delay(1000);
+  int newTarget = orientation.getTargetOrientation();
+  if (newTarget != lastKnownTarget) {
+    animator.setTarget((float)newTarget);
+    lastKnownTarget = newTarget;
+  }
+
+  animator.update();
+
+  if (timeStr != lastTimeStr || !animator.isSettled()) {
+    display.renderRotatedTime(timeStr, animator.getCurrentAngle());
+    lastTimeStr = timeStr;
+  }
+
+  delay(20);
 }
