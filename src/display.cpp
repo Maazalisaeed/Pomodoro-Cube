@@ -92,3 +92,57 @@ void DisplayManager::drawRotated(float angleDeg) {
     // The ONE actual SPI transfer for this whole frame - this is what kills the jitter
     tft.drawRGBBitmap(RENDER_X, RENDER_Y, renderBuf.getBuffer(), RENDER_SIZE, RENDER_SIZE);
 }
+void DisplayManager::drawRingInto(GFXcanvas16 &buf, float fraction, uint16_t color) {
+    if (fraction < 0) fraction = 0;
+    if (fraction > 1) fraction = 1;
+
+    int outerR = (int)(RING_MAX_RADIUS * fraction);
+    int innerR = outerR - RING_THICKNESS;
+    if (innerR < 0) innerR = 0;
+
+    int cx = RENDER_SIZE / 2, cy = RENDER_SIZE / 2;
+
+    for (int r = innerR; r <= outerR; r++) {
+        buf.drawCircle(cx, cy, r, color);
+    }
+}
+
+void DisplayManager::renderFrame(String text, float angleDeg, float ringFraction, uint16_t ringColor) {
+    int16_t x1, y1;
+    uint16_t w, h;
+
+    canvas.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+    canvas.fillScreen(GC9A01A_BLACK);
+    int16_t cursorX = (BOX_W / 2) - (w / 2) - x1;
+    int16_t cursorY = (BOX_H / 2) - (h / 2) - y1;
+    canvas.setCursor(cursorX, cursorY);
+    canvas.print(text);
+
+    float rad = angleDeg * PI / 180.0f;
+    float cosA = cos(rad);
+    float sinA = sin(rad);
+    int srcCx = BOX_W / 2, srcCy = BOX_H / 2;
+    int dstCx = RENDER_SIZE / 2, dstCy = RENDER_SIZE / 2;
+    uint16_t *srcBuf = canvas.getBuffer();
+
+    renderBuf.fillScreen(GC9A01A_BLACK);
+    drawRingInto(renderBuf, ringFraction, ringColor);
+
+    for (int y = 0; y < RENDER_SIZE; y++) {
+        for (int x = 0; x < RENDER_SIZE; x++) {
+            int dx = x - dstCx;
+            int dy = y - dstCy;
+            int srcX = (int)roundf(dx * cosA - dy * sinA) + srcCx;
+            int srcY = (int)roundf(dx * sinA + dy * cosA) + srcCy;
+
+            if (srcX >= 0 && srcX < BOX_W && srcY >= 0 && srcY < BOX_H) {
+                uint16_t color = srcBuf[srcY * BOX_W + srcX];
+                if (color != GC9A01A_BLACK) {
+                    renderBuf.drawPixel(x, y, color);
+                }
+            }
+        }
+    }
+
+    tft.drawRGBBitmap(RENDER_X, RENDER_Y, renderBuf.getBuffer(), RENDER_SIZE, RENDER_SIZE);
+}

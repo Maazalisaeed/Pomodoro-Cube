@@ -33,8 +33,6 @@ Face OrientationManager::rawDominantFace(float ax, float ay, float az) {
     }
 }
 
-// Returns how strongly gravity is currently aligned with a specific face's axis,
-// regardless of whether that face is the current dominant one.
 float OrientationManager::magnitudeForFace(Face f, float ax, float ay, float az) {
     switch (f) {
         case Face::POS_X: return ax;
@@ -54,22 +52,20 @@ void OrientationManager::update() {
     float ay = mpu.getAccY();
     float az = mpu.getAccZ();
 
-  
+    Serial.print("AccX: "); Serial.print(ax);
+    Serial.print("  AccY: "); Serial.print(ay);
+    Serial.print("  AccZ: "); Serial.println(az);
 
     Face rawFace = rawDominantFace(ax, ay, az);
 
-    // How strong is gravity along the CURRENT target's axis right now?
     float currentStrength = magnitudeForFace(currentTarget, ax, ay, az);
-    // How strong is gravity along the newly-detected raw candidate's axis?
     float rawStrength = magnitudeForFace(rawFace, ax, ay, az);
 
     if (rawFace == currentTarget) {
         candidateTarget = currentTarget;
-        return; // no change in raw reading, nothing to debounce
+        return;
     }
 
-    // Only treat this as a real candidate if it's convincingly stronger
-    // than how aligned we currently are with the existing target.
     if (rawStrength > currentStrength + SWITCH_MARGIN) {
         if (rawFace != candidateTarget) {
             candidateTarget = rawFace;
@@ -78,7 +74,7 @@ void OrientationManager::update() {
             currentTarget = candidateTarget;
         }
     } else {
-        candidateTarget = currentTarget; // not convincing enough, reset any pending candidate
+        candidateTarget = currentTarget;
     }
 }
 
@@ -103,27 +99,20 @@ void OrientationManager::printDebug() {
     float ay = mpu.getAccY();
     float az = mpu.getAccZ();
 
-    Serial.print("AccX: "); Serial.print(ax);
-    Serial.print("  AccY: "); Serial.print(ay);
-    Serial.print("  AccZ: "); Serial.print(az);
-    Serial.print("  -> target: ");
-    Serial.println(faceName(currentTarget));
+    
 }
+
 bool OrientationManager::isSideFace(Face f) {
     return f == Face::POS_X || f == Face::NEG_X ||
            f == Face::POS_Y || f == Face::NEG_Y;
 }
 
-// Fixed mapping of the 4 side faces to display angles.
-// This is just a convention for now since the sensor isn't mounted in the
-// final cube yet - once it is, you may need to re-map these to match
-// physical reality (e.g. +X might need to become 180 instead of 0).
 float OrientationManager::angleForFace(Face f) {
     switch (f) {
         case Face::POS_X: return 0.0f;
         case Face::POS_Y: return 90.0f;
         case Face::NEG_X: return 180.0f;
         case Face::NEG_Y: return 270.0f;
-        default: return 0.0f; // POS_Z / NEG_Z shouldn't call this
+        default: return 0.0f;
     }
 }

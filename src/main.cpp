@@ -22,13 +22,13 @@ AppMode mode = AppMode::CLOCK;
 
 // Hardcoded per your plan - these will correspond to numbers printed on
 // the 4 side faces once the case is designed/printed.
-unsigned long durationForFace(Face f) {
+int levelIndexForFace(Face f) {
     switch (f) {
-        case Face::POS_X: return 15UL * 60;
-        case Face::NEG_X: return 30UL * 60;
-        case Face::POS_Y: return 45UL * 60;
-        case Face::NEG_Y: return 60UL * 60;
-        default: return 15UL * 60;
+        case Face::POS_X: return 0; // 15/5/15
+        case Face::NEG_X: return 1; // 30/7/20
+        case Face::POS_Y: return 2; // 45/10/30
+        case Face::NEG_Y: return 3; // 60/15/60
+        default: return 0;
     }
 }
 
@@ -71,13 +71,14 @@ void setup() {
 
 void loop() {
   orientation.update();
+  pomodoro.update();
   Face target = orientation.getTargetFace();
 
   // --- Button: switch between clock and pomodoro mode ---
   if (button.wasPressed()) {
     if (mode == AppMode::CLOCK) {
       mode = AppMode::POMODORO;
-      pomodoro.start(durationForFace(target)); // duration locked in at the moment you press
+      pomodoro.startCycle(levelIndexForFace(target)); // duration locked in at the moment you press
     } else {
       mode = AppMode::CLOCK;
       pomodoro.reset();
@@ -101,24 +102,40 @@ void loop() {
     }
   }
   animator.update();
-
+  Serial.print("target face: "); Serial.print(orientation.faceName(target));
+  Serial.print("  animator target: "); Serial.print(orientation.angleForFace(target));
+  Serial.print("  current angle: "); Serial.println(animator.getCurrentAngle());
   // --- Decide what string to show based on mode ---
   static String lastDisplayStr = "";
   String displayStr;
   int h, m, s;
-
-  if (mode == AppMode::CLOCK) {
-    if (wifiClock.getTime(h, m, s)) {
-      displayStr = formatTime(h, m, s);
-    }
-  } else {
-    displayStr = formatCountdown(pomodoro.getRemainingSeconds());
+if (mode == AppMode::CLOCK) {
+  if (wifiClock.getTime(h, m, s)) {
+    displayStr = formatTime(h, m, s);
   }
+} else {
+  displayStr = formatCountdown(pomodoro.getRemainingSeconds());
+}  
+static float lastRingFraction = -1.0f;  
 
-  if (displayStr != lastDisplayStr || !animator.isSettled()) {
-    display.renderRotatedTime(displayStr, animator.getCurrentAngle());
-    lastDisplayStr = displayStr;
+  float ringFraction = 1.0f;
+uint16_t ringColor = GC9A01A_WHITE;
+
+if (mode == AppMode::POMODORO) {
+  unsigned long total = pomodoro.getPhaseDurationSeconds();
+  unsigned long remaining = pomodoro.getRemainingSeconds();
+  ringFraction = (total > 0) ? (float)remaining / (float)total : 0.0f;
+
+  switch (pomodoro.getPhase()) {
+    case PomodoroPhase::WORK:        ringColor = GC9A01A_CYAN;   break;
+    case PomodoroPhase::SHORT_BREAK: ringColor = GC9A01A_YELLOW; break;
+    case PomodoroPhase::LONG_BREAK:  ringColor = GC9A01A_GREEN;  break;
   }
+}
 
-  delay(20);
+if (displayStr != lastDisplayStr || !animator.isSettled() || ringFraction != lastRingFraction) {
+  display.renderFrame(displayStr, animator.getCurrentAngle(), ringFraction, ringColor);
+  lastDisplayStr = displayStr;
+  lastRingFraction = ringFraction;
+}
 }
