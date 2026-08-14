@@ -20,9 +20,10 @@ public:
 
 
 private:
-    void drawRotated(float angleDeg); // blits the current canvas contents to tft, rotated
+    void drawRotated(float angleDeg);
     Adafruit_GC9A01A tft;
     GFXcanvas16 canvas;
+    GFXcanvas16 renderBuf; // full RENDER_SIZE buffer - built in RAM, pushed to screen in one shot
 
     // Screen + text box layout constants
     static const int SCREEN_CENTER_X = 120;
@@ -31,8 +32,11 @@ private:
     static const int BOX_H = 80;
     static const int BOX_X = SCREEN_CENTER_X - BOX_W / 2;
     static const int BOX_Y = SCREEN_CENTER_Y - BOX_H / 2;
-
+    static const int RENDER_SIZE = 220; // big enough to hold the 200x80 text at any rotation angle
+    static const int RENDER_X = SCREEN_CENTER_X - RENDER_SIZE / 2;
+    static const int RENDER_Y = SCREEN_CENTER_Y - RENDER_SIZE / 2;
 public:
     // Constructor: sets up the tft and canvas objects with the right pins/size
     DisplayManager();
+
 };

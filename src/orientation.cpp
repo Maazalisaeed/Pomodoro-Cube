@@ -21,16 +21,30 @@ bool OrientationManager::begin() {
     return true;
 }
 
-float OrientationManager::readRawAngleDeg() {
-    // atan2 gives -180..180, normalize to 0..359.9
-    float deg = atan2(mpu.getAccX(), mpu.getAccY()) * 180.0f / PI;
-    if (deg < 0) deg += 360.0f;
-    return deg;
+Face OrientationManager::rawDominantFace(float ax, float ay, float az) {
+    float absX = fabs(ax), absY = fabs(ay), absZ = fabs(az);
+
+    if (absX > absY && absX > absZ) {
+        return ax > 0 ? Face::POS_X : Face::NEG_X;
+    } else if (absY > absX && absY > absZ) {
+        return ay > 0 ? Face::POS_Y : Face::NEG_Y;
+    } else {
+        return az > 0 ? Face::POS_Z : Face::NEG_Z;
+    }
 }
 
-float OrientationManager::angleDiff(float a, float b) {
-    float diff = fmod(a - b + 540.0f, 360.0f) - 180.0f;
-    return diff;
+// Returns how strongly gravity is currently aligned with a specific face's axis,
+// regardless of whether that face is the current dominant one.
+float OrientationManager::magnitudeForFace(Face f, float ax, float ay, float az) {
+    switch (f) {
+        case Face::POS_X: return ax;
+        case Face::NEG_X: return -ax;
+        case Face::POS_Y: return ay;
+        case Face::NEG_Y: return -ay;
+        case Face::POS_Z: return az;
+        case Face::NEG_Z: return -az;
+    }
+    return 0;
 }
 
 void OrientationManager::update() {
@@ -38,43 +52,78 @@ void OrientationManager::update() {
 
     float ax = mpu.getAccX();
     float ay = mpu.getAccY();
-    float tiltMagnitude = sqrt(ax * ax + ay * ay);
+    float az = mpu.getAccZ();
 
-    // When nearly flat, X/Y are too small to give a reliable angle - skip this cycle entirely
-    static constexpr float MIN_TILT = 0.15f;
-    if (tiltMagnitude < MIN_TILT) {
-        return; // hold whatever target we already have, don't even consider changing it
-    }
+  
 
-    float raw = readRawAngleDeg();
-    float distFromCurrent = fabs(angleDiff(raw, currentTarget));
+    Face rawFace = rawDominantFace(ax, ay, az);
 
-    if (distFromCurrent <= 45.0f + HYSTERESIS_DEG) {
+    // How strong is gravity along the CURRENT target's axis right now?
+    float currentStrength = magnitudeForFace(currentTarget, ax, ay, az);
+    // How strong is gravity along the newly-detected raw candidate's axis?
+    float rawStrength = magnitudeForFace(rawFace, ax, ay, az);
+
+    if (rawFace == currentTarget) {
         candidateTarget = currentTarget;
-        return;
+        return; // no change in raw reading, nothing to debounce
     }
 
-    int nearestBucket = ((int)roundf(raw / 90.0f) % 4) * 90;
-    if (nearestBucket < 0) nearestBucket += 360;
-
-    if (nearestBucket != candidateTarget) {
-        candidateTarget = nearestBucket;
-        candidateSince = millis();
-    } else if (millis() - candidateSince >= CONFIRM_MS) {
-        currentTarget = candidateTarget;
+    // Only treat this as a real candidate if it's convincingly stronger
+    // than how aligned we currently are with the existing target.
+    if (rawStrength > currentStrength + SWITCH_MARGIN) {
+        if (rawFace != candidateTarget) {
+            candidateTarget = rawFace;
+            candidateSince = millis();
+        } else if (millis() - candidateSince >= CONFIRM_MS) {
+            currentTarget = candidateTarget;
+        }
+    } else {
+        candidateTarget = currentTarget; // not convincing enough, reset any pending candidate
     }
 }
 
-int OrientationManager::getTargetOrientation() {
+Face OrientationManager::getTargetFace() {
     return currentTarget;
 }
+
+const char* OrientationManager::faceName(Face f) {
+    switch (f) {
+        case Face::POS_X: return "+X";
+        case Face::NEG_X: return "-X";
+        case Face::POS_Y: return "+Y";
+        case Face::NEG_Y: return "-Y";
+        case Face::POS_Z: return "+Z";
+        case Face::NEG_Z: return "-Z";
+    }
+    return "?";
+}
+
 void OrientationManager::printDebug() {
-    Serial.print("AccX: ");
-    Serial.print(mpu.getAccX());
-    Serial.print("  AccY: ");
-    Serial.print(mpu.getAccY());
-    Serial.print("  AccZ: ");
-    Serial.print(mpu.getAccZ());
+    float ax = mpu.getAccX();
+    float ay = mpu.getAccY();
+    float az = mpu.getAccZ();
+
+    Serial.print("AccX: "); Serial.print(ax);
+    Serial.print("  AccY: "); Serial.print(ay);
+    Serial.print("  AccZ: "); Serial.print(az);
     Serial.print("  -> target: ");
-    Serial.println(getTargetOrientation());
+    Serial.println(faceName(currentTarget));
+}
+bool OrientationManager::isSideFace(Face f) {
+    return f == Face::POS_X || f == Face::NEG_X ||
+           f == Face::POS_Y || f == Face::NEG_Y;
+}
+
+// Fixed mapping of the 4 side faces to display angles.
+// This is just a convention for now since the sensor isn't mounted in the
+// final cube yet - once it is, you may need to re-map these to match
+// physical reality (e.g. +X might need to become 180 instead of 0).
+float OrientationManager::angleForFace(Face f) {
+    switch (f) {
+        case Face::POS_X: return 0.0f;
+        case Face::POS_Y: return 90.0f;
+        case Face::NEG_X: return 180.0f;
+        case Face::NEG_Y: return 270.0f;
+        default: return 0.0f; // POS_Z / NEG_Z shouldn't call this
+    }
 }

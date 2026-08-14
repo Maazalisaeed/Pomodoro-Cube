@@ -9,7 +9,7 @@ WifiClockManager wifiClock;
 OrientationManager orientation;
 RotationAnimator animator;
 
-int lastKnownTarget = 0;
+Face lastRotationFace = Face::POS_X; // tracks last SIDE face we animated to
 
 String formatTime(int h, int m, int s) {
   char buf[9];
@@ -48,11 +48,16 @@ void loop() {
 
   orientation.update();
 
-  int newTarget = orientation.getTargetOrientation();
-  if (newTarget != lastKnownTarget) {
-    animator.setTarget((float)newTarget);
-    lastKnownTarget = newTarget;
+  Face target = orientation.getTargetFace();
+
+  if (orientation.isSideFace(target)) {
+    if (target != lastRotationFace) {
+      animator.setTarget(orientation.angleForFace(target));
+      lastRotationFace = target;
+    }
   }
+  // else: Z+ or Z- - do nothing for now. This is intentionally a stub -
+  // this is where the pomodoro pause/start logic will hook in later.
 
   animator.update();
 

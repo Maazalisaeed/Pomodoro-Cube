@@ -9,7 +9,7 @@
 // This colon syntax is called an "initializer list" - it's how you pass
 // constructor arguments to member objects that need them at creation time.
 DisplayManager::DisplayManager()
-    : tft(TFT_CS, TFT_DC, TFT_RST), canvas(BOX_W, BOX_H) {
+    : tft(TFT_CS, TFT_DC, TFT_RST), canvas(BOX_W, BOX_H), renderBuf(RENDER_SIZE, RENDER_SIZE) {
 }
 
 void DisplayManager::begin() {
@@ -66,27 +66,29 @@ void DisplayManager::renderRotatedTime(String timeStr, float angleDeg) {
 
 void DisplayManager::drawRotated(float angleDeg) {
     float rad = angleDeg * PI / 180.0f;
-    float cosA = cos(-rad);
-    float sinA = sin(-rad);
+    float cosA = cos(rad);
+    float sinA = sin(rad);
 
-    int cx = BOX_W / 2, cy = BOX_H / 2;
-    uint16_t *buf = canvas.getBuffer();
+    int srcCx = BOX_W / 2, srcCy = BOX_H / 2;
+    int dstCx = RENDER_SIZE / 2, dstCy = RENDER_SIZE / 2;
 
-    for (int y = 0; y < BOX_H; y++) {
-        for (int x = 0; x < BOX_W; x++) {
-            int dx = x - cx;
-            int dy = y - cy;
-            int srcX = (int)roundf(dx * cosA - dy * sinA) + cx;
-            int srcY = (int)roundf(dx * sinA + dy * cosA) + cy;
+    uint16_t *srcBuf = canvas.getBuffer();
 
-            uint16_t color;
+    renderBuf.fillScreen(GC9A01A_BLACK); // clears in RAM - cheap, no SPI involved
+
+    for (int y = 0; y < RENDER_SIZE; y++) {
+        for (int x = 0; x < RENDER_SIZE; x++) {
+            int dx = x - dstCx;
+            int dy = y - dstCy;
+            int srcX = (int)roundf(dx * cosA - dy * sinA) + srcCx;
+            int srcY = (int)roundf(dx * sinA + dy * cosA) + srcCy;
+
             if (srcX >= 0 && srcX < BOX_W && srcY >= 0 && srcY < BOX_H) {
-                color = buf[srcY * BOX_W + srcX];
-            } else {
-                color = GC9A01A_BLACK;
+                renderBuf.drawPixel(x, y, srcBuf[srcY * BOX_W + srcX]); // RAM write, not SPI - very fast
             }
-
-            tft.drawPixel(BOX_X + x, BOX_Y + y, color);
         }
     }
+
+    // The ONE actual SPI transfer for this whole frame - this is what kills the jitter
+    tft.drawRGBBitmap(RENDER_X, RENDER_Y, renderBuf.getBuffer(), RENDER_SIZE, RENDER_SIZE);
 }
