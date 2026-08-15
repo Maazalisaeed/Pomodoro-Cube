@@ -17,11 +17,12 @@ public:
     void drawCenteredTime(String timeStr);
     void clearScreen();
     void renderRotatedTime(String timeStr, float angleDeg); // new: rotated version of drawCenteredTime
-    void renderFrame(String text, float angleDeg, float ringFraction, uint16_t ringColor);
+    void renderFrame(String text, float angleDeg, float ringFraction, uint16_t ringColor, bool dashedRing);
 
 private:
-    void drawRotated(float angleDeg);
-    void drawRingInto(GFXcanvas16 &buf, float fraction, uint16_t color); // NEW
+    void drawRotated(float angleDeg);// this function deal with rotation
+    void drawRingInto(GFXcanvas16 &buf, float fraction, uint16_t color); // this function deal with the drawig the ring aroudn the pomodoro timer
+    void drawDashedRingInto(GFXcanvas16 &buf, int numDashes, float dashWidthDeg, uint16_t color);// this function deal with drawing a dashed ring around clock face
 
     Adafruit_GC9A01A tft;
     GFXcanvas16 canvas;

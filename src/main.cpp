@@ -134,7 +134,7 @@ if (mode == AppMode::POMODORO) {
 }
 
 if (displayStr != lastDisplayStr || !animator.isSettled() || ringFraction != lastRingFraction) {
-  display.renderFrame(displayStr, animator.getCurrentAngle(), ringFraction, ringColor);
+  display.renderFrame(displayStr, animator.getCurrentAngle(), ringFraction, ringColor, mode == AppMode::CLOCK);
   lastDisplayStr = displayStr;
   lastRingFraction = ringFraction;
 }

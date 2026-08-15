@@ -96,18 +96,29 @@ void DisplayManager::drawRingInto(GFXcanvas16 &buf, float fraction, uint16_t col
     if (fraction < 0) fraction = 0;
     if (fraction > 1) fraction = 1;
 
-    int outerR = (int)(RING_MAX_RADIUS * fraction);
-    int innerR = outerR - RING_THICKNESS;
-    if (innerR < 0) innerR = 0;
-
     int cx = RENDER_SIZE / 2, cy = RENDER_SIZE / 2;
+    int outerR = RING_MAX_RADIUS;       // fixed size now - stays put at the rim
+    int innerR = outerR - RING_THICKNESS;
 
-    for (int r = innerR; r <= outerR; r++) {
-        buf.drawCircle(cx, cy, r, color);
+    float sweepDeg = fraction * 360.0f; // how much of the circle is still "remaining"
+
+    for (int y = -outerR; y <= outerR; y++) {
+        for (int x = -outerR; x <= outerR; x++) {
+            float r = sqrtf((float)(x * x + y * y));
+            if (r < innerR || r > outerR) continue; // only care about the ring band
+
+            // Angle measured clockwise from the top (12 o'clock), like a clock face
+            float clockAngle = atan2f((float)x, (float)-y) * 180.0f / PI;
+            if (clockAngle < 0) clockAngle += 360.0f;
+
+            if (clockAngle < sweepDeg) {
+                buf.drawPixel(cx + x, cy + y, color);
+            }
+        }
     }
 }
 
-void DisplayManager::renderFrame(String text, float angleDeg, float ringFraction, uint16_t ringColor) {
+void DisplayManager::renderFrame(String text, float angleDeg, float ringFraction, uint16_t ringColor, bool dashedRing) {
     int16_t x1, y1;
     uint16_t w, h;
 
@@ -126,7 +137,12 @@ void DisplayManager::renderFrame(String text, float angleDeg, float ringFraction
     uint16_t *srcBuf = canvas.getBuffer();
 
     renderBuf.fillScreen(GC9A01A_BLACK);
-    drawRingInto(renderBuf, ringFraction, ringColor);
+
+    if (dashedRing) {
+        drawDashedRingInto(renderBuf, 11, 15.0f, ringColor); // 11 dashes, ~9 deg wide each
+    } else {
+        drawRingInto(renderBuf, ringFraction, ringColor);
+    }
 
     for (int y = 0; y < RENDER_SIZE; y++) {
         for (int x = 0; x < RENDER_SIZE; x++) {
@@ -145,4 +161,31 @@ void DisplayManager::renderFrame(String text, float angleDeg, float ringFraction
     }
 
     tft.drawRGBBitmap(RENDER_X, RENDER_Y, renderBuf.getBuffer(), RENDER_SIZE, RENDER_SIZE);
+}
+void DisplayManager::drawDashedRingInto(GFXcanvas16 &buf, int numDashes, float dashWidthDeg, uint16_t color) {
+    int cx = RENDER_SIZE / 2, cy = RENDER_SIZE / 2;
+    int outerR = RING_MAX_RADIUS;
+    int innerR = outerR - RING_THICKNESS;
+
+    float slotDeg = 360.0f / numDashes; // spacing between dash centers - ~32.7 deg for 11 dashes
+
+    for (int y = -outerR; y <= outerR; y++) {
+        for (int x = -outerR; x <= outerR; x++) {
+            float r = sqrtf((float)(x * x + y * y));
+            if (r < innerR || r > outerR) continue;
+
+            float clockAngle = atan2f((float)x, (float)-y) * 180.0f / PI;
+            if (clockAngle < 0) clockAngle += 360.0f;
+
+            // Where does this pixel fall inside its own 32.7-degree slot?
+            float posInSlot = fmodf(clockAngle, slotDeg);
+            float slotCenter = slotDeg / 2.0f;
+            float halfDash = dashWidthDeg / 2.0f;
+
+            // Only draw if close to the CENTER of the slot - leaves a gap on both sides
+            if (fabsf(posInSlot - slotCenter) < halfDash) {
+                buf.drawPixel(cx + x, cy + y, color);
+            }
+        }
+    }
 }
