@@ -139,7 +139,7 @@ void DisplayManager::renderFrame(String text, float angleDeg, float ringFraction
     renderBuf.fillScreen(GC9A01A_BLACK);
 
     if (dashedRing) {
-        drawDashedRingInto(renderBuf, 11, 15.0f, ringColor); // 11 dashes, ~9 deg wide each
+        drawDashedRingInto(renderBuf, 11, 15.0f, ringColor, angleDeg); // 11 dashes, ~9 deg wide each
     } else {
         drawRingInto(renderBuf, ringFraction, ringColor);
     }
@@ -162,12 +162,12 @@ void DisplayManager::renderFrame(String text, float angleDeg, float ringFraction
 
     tft.drawRGBBitmap(RENDER_X, RENDER_Y, renderBuf.getBuffer(), RENDER_SIZE, RENDER_SIZE);
 }
-void DisplayManager::drawDashedRingInto(GFXcanvas16 &buf, int numDashes, float dashWidthDeg, uint16_t color) {
+void DisplayManager::drawDashedRingInto(GFXcanvas16 &buf, int numDashes, float dashWidthDeg, uint16_t color, float angleDeg) {
     int cx = RENDER_SIZE / 2, cy = RENDER_SIZE / 2;
     int outerR = RING_MAX_RADIUS;
     int innerR = outerR - RING_THICKNESS;
 
-    float slotDeg = 360.0f / numDashes; // spacing between dash centers - ~32.7 deg for 11 dashes
+    float slotDeg = 360.0f / numDashes;
 
     for (int y = -outerR; y <= outerR; y++) {
         for (int x = -outerR; x <= outerR; x++) {
@@ -177,12 +177,13 @@ void DisplayManager::drawDashedRingInto(GFXcanvas16 &buf, int numDashes, float d
             float clockAngle = atan2f((float)x, (float)-y) * 180.0f / PI;
             if (clockAngle < 0) clockAngle += 360.0f;
 
-            // Where does this pixel fall inside its own 32.7-degree slot?
-            float posInSlot = fmodf(clockAngle, slotDeg);
+            // Shift the dash pattern by the same angle the text is rotated by
+            float rotatedAngle = fmodf(clockAngle - angleDeg + 360.0f, 360.0f);
+
+            float posInSlot = fmodf(rotatedAngle, slotDeg);
             float slotCenter = slotDeg / 2.0f;
             float halfDash = dashWidthDeg / 2.0f;
 
-            // Only draw if close to the CENTER of the slot - leaves a gap on both sides
             if (fabsf(posInSlot - slotCenter) < halfDash) {
                 buf.drawPixel(cx + x, cy + y, color);
             }

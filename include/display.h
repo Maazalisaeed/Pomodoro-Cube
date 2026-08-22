@@ -22,7 +22,7 @@ public:
 private:
     void drawRotated(float angleDeg);// this function deal with rotation
     void drawRingInto(GFXcanvas16 &buf, float fraction, uint16_t color); // this function deal with the drawig the ring aroudn the pomodoro timer
-    void drawDashedRingInto(GFXcanvas16 &buf, int numDashes, float dashWidthDeg, uint16_t color);// this function deal with drawing a dashed ring around clock face
+    void drawDashedRingInto(GFXcanvas16 &buf, int numDashes, float dashWidthDeg, uint16_t color, float angleDeg);// this function deal with drawing a dashed ring around clock face
 
     Adafruit_GC9A01A tft;
     GFXcanvas16 canvas;
